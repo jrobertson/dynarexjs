@@ -1,4 +1,4 @@
-# file: dynarex.js
+// file: dynarex.js
 
 function loadXMLDoc(url) {
 
