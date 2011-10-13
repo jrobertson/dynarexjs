@@ -2,46 +2,30 @@
 
 // requires jaxle.js, and jfr.js
 
-function Dynarex(file) {
+function dynarexNew(file) {
 
-  xml = new Jaxle(file).root;
-
+  var doc = Jaxle.new(file);
   var dynarex = new Object();
-
-  dynarex.summary = [];
-  summary = xml.firstChild.childNodes[0];
-
-  // fetch the dynarex summary
-  summary.elements().each(function(item){
-    dynarex.summary[item.nodeName] = item.text;
+  
+  dynarex.summary = doc.firstChild.xpath('summary/*').inject({},function(r,item){
+    return r.merge(Hash(item.nodeName, item.text()));
   });
   
-  dynarex.records = new rb.Array();
-  records = xml.firstChild.childNodes[1];
-
-  // fetch the dynarex records
-  records.elements().each(function(rec){
-
-    var record = [];
-
-    rec.elements().each(function(field){
-      record[field.nodeName] = field.text();
+  dynarex.records = doc.firstChild.xpath('records/*').map(function(rec){
+    return rec.elements().inject({},function(r,field){
+      return r.merge(Hash(field.nodeName, field.text()));
     });
-    //dynarex.records[k] = record;
-    dynarex.records.push(record);    
   });
 
-  // return the dynarex object
   return dynarex;
 }
 
-
-// -- start of dynarex data islands --------
+Dynarex = {new: dynarexNew};
 
 function findHTMLRecordToClone(element) {
 
   parent = element.parentNode;
-  parentName = new rb.String(parent.nodeName).downcase();
+  parentName = rb.String.new(parent.nodeName).downcase();
 
   switch (parentName) {
     case 'body' : 
@@ -57,7 +41,7 @@ function findHTMLRecordToClone(element) {
 
 function dataIslandRender(file, node) {
 
-  dynarex = Dynarex(file);
+  var dynarex = Dynarex.new(file);
   recOriginal = findHTMLRecordToClone(node);
   
   if (recOriginal) {
@@ -74,8 +58,8 @@ function dataIslandRender(file, node) {
       });
 
       for (field in destNodes){
-        if (record[field] == null) continue;
-        destNodes[field].innerHTML = record[field];
+        if (record.get(field) == nil) continue;
+        destNodes[field].innerHTML = record.get(field).to_s();
       }    
 
       recOriginal.parentNode.appendChild(rec);
@@ -90,8 +74,8 @@ function dataIslandInit(){
   document.xpath("//object[@type='text/xml']").each( function(x){
     xpath = "//*[@datasrc='#" + x.attribute('id').to_s() + "']"
     document.xpath(xpath).each(function(island){
-      node = island.element('//span[@datafld]');
-      dataIslandRender(x.attribute('data').to_s(), node);
+      dataIslandRender(x.attribute('data').to_s(), 
+                       island.element('//span[@datafld]'));
     });
   });
 }
