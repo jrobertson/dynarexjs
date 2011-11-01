@@ -8,12 +8,13 @@ function dynarexNew(file) {
   var dynarex = new Object();
   
   dynarex.summary = doc.firstChild.xpath('summary/*').inject({},function(r,item){
-    return r.merge(Hash(item.nodeName, item.text()));
+    var h = Hash(item.nodeName, item.text().to_s() );
+    return r.merge(h);
   });
   
   dynarex.records = doc.firstChild.xpath('records/*').map(function(rec){
     return rec.elements().inject({},function(r,field){
-      return r.merge(Hash(field.nodeName, field.text()));
+      return r.merge(Hash(field.nodeName, field.text().to_s()));
     });
   });
 
@@ -39,8 +40,11 @@ function findHTMLRecordToClone(element) {
   }
 }
 
-function dataIslandRender(file, node) {
-
+function dataIslandRender(x, node) {
+  
+  var file = x.attribute('data').to_s();
+  var sort_by = x.attribute('sort_by');
+    
   var dynarex = Dynarex.new(file);
   recOriginal = findHTMLRecordToClone(node);
   
@@ -49,8 +53,20 @@ function dataIslandRender(file, node) {
     // get a reference to each element containing the datafld attribute
     var destNodes = [];
     
-    dynarex.records.each(function(record){
-    
+    if (sort_by != null) {
+      if (sort_by.regex(/^-/) == nil) {
+        var sort_field = sort_by.to_s();
+        var recs = dynarex.records.sort_by(function(record){ return record.get(sort_field); });
+      }
+      else {
+        var sort_field = sort_by.range(1,-1).to_s();
+        var recs = dynarex.records.sort_by(function(record){ return record.get(sort_field); }).reverse();
+      }
+    }
+    else {
+      var recs = dynarex.records;
+    }
+    recs.each(function(record){    
       rec = recOriginal.cloneNode(true);
 
       rec.xpath('//span[@datafld]').each(function(span){
@@ -65,7 +81,8 @@ function dataIslandRender(file, node) {
       recOriginal.parentNode.appendChild(rec);
     });
 
-    recOriginal.parentNode.removeChild(recOriginal);
+    //recOriginal.parentNode.removeChild(recOriginal);
+    rec.delete();
   }
 
 }
@@ -74,8 +91,7 @@ function dataIslandInit(){
   document.xpath("//object[@type='text/xml']").each( function(x){
     xpath = "//*[@datasrc='#" + x.attribute('id').to_s() + "']"
     document.xpath(xpath).each(function(island){
-      dataIslandRender(x.attribute('data').to_s(), 
-                       island.element('//span[@datafld]'));
+      dataIslandRender(x, island.element('//span[@datafld]'));
     });
   });
 }
