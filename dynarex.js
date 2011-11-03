@@ -44,6 +44,9 @@ function dataIslandRender(x, node) {
   
   var file = x.attribute('data').to_s();
   var sort_by = x.attribute('sort_by');
+  var range = x.attribute('range');
+  var rows_per_page = x.attribute('rows_per_page');
+  var page = x.attribute('page');
     
   var dynarex = Dynarex.new(file);
   recOriginal = findHTMLRecordToClone(node);
@@ -53,14 +56,29 @@ function dataIslandRender(x, node) {
     // get a reference to each element containing the datafld attribute
     var destNodes = [];
     
-    if (sort_by != null) {
+    records = dynarex.records;
+    
+    if (rows_per_page != nil && page != nil){
+      var pg = page.to_i()
+      var rpp = rows_per_page.to_i();
+      x.setAttribute('range', (pg > 1) ? 
+        (pg - 1) * rpp + '..' + (((pg - 1) * rpp ) + rpp - 1) : '0..' + (rpp - 1))
+      range = x.attribute('range');
+    }
+    
+    if (range != nil && range.length() > 0) {
+      var i = range.match(/(\d+)(\.\.|,)(\d+)/).values_at(1,-1)
+      records = dynarex.records.range(i.at(0).to_i(), i.at(-1).to_i());
+    }
+
+    if (sort_by != nil) {
       if (sort_by.regex(/^-/) == nil) {
         var sort_field = sort_by.to_s();
-        var recs = dynarex.records.sort_by(function(record){ return record.get(sort_field); });
+        var recs = records.sort_by(function(record){ return record.get(sort_field); });
       }
       else {
         var sort_field = sort_by.range(1,-1).to_s();
-        var recs = dynarex.records.sort_by(function(record){ return record.get(sort_field); }).reverse();
+        var recs = records.sort_by(function(record){ return record.get(sort_field); }).reverse();
       }
     }
     else {
