@@ -14,7 +14,8 @@ function dynarexNew(file) {
   
   dynarex.records = doc.firstChild.xpath('records/*').map(function(rec){
     return rec.elements().inject({},function(r,field){
-      return r.merge(Hash(field.nodeName, field.text().to_s()));
+      return field.nodeType == 1 ? 
+        r.merge(Hash(field.nodeName, field.text().to_s())) : nil;
     });
   });
 
@@ -116,9 +117,10 @@ function dataIslandInit(){
     var dynarex = Dynarex.new(x.attribute('data').to_s());
     var order = x.attribute('order');
     
-    if (order != nil && order.regex(/^asc|desc|ascending|descending$/)){
-      x.dynarex = {};
-      x.dynarex.records = (order.regex(/^desc|descending$/)) ? dynarex.records.reverse() : dynarex.records;      
+    x.dynarex = {};
+    x.dynarex.records = dynarex.records;
+    if (order != nil && order.regex(/^asc|desc|ascending|descending$/)){      
+      if (order.regex(/^desc|descending$/) != nil) x.dynarex.records = dynarex.records.reverse();
     }    
     
     var datactl = '#' + x.attribute('id').to_s()
@@ -187,6 +189,7 @@ dynarexDataIsland = {init: dataIslandInit, refresh: dataIslandRefresh}
     var e = document.element("//*[@datactl='#" + datactl + "']");
     var btnPrevious = e.element("button[@id='previous']");
     var btnNext = e.element("button[@id='next']");
+    var btnPage1 = e.element("button[@id='page1']");
 
     // -- next button --   
     var count = x.dynarex.records.count();
@@ -196,8 +199,14 @@ dynarexDataIsland = {init: dataIslandInit, refresh: dataIslandRefresh}
     // -- end of next button
 
     // -- previous button --
-    (pg > 1) ? btnPrevious.removeAttribute('disabled') : 
+    if (pg > 1) {
+      btnPrevious.removeAttribute('disabled');
+      btnPage1.removeAttribute('disabled'); 
+    }
+    else {
       btnPrevious.setAttribute('disabled','disabled');
+      btnPage1.setAttribute('disabled','disabled');
+    }
     // -- end of previous button
 
     document.getElementById('debug').innerHTML = 'page ' + pg;
