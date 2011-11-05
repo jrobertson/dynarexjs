@@ -25,8 +25,8 @@ Dynarex = {new: dynarexNew};
 
 function findHTMLRecordToClone(element) {
 
-  parent = element.parentNode;
-  parentName = rb.String.new(parent.nodeName).downcase();
+  parent = element.parent();
+  parentName = parent.name().downcase().to_s();
 
   switch (parentName) {
     case 'body' : 
@@ -40,15 +40,12 @@ function findHTMLRecordToClone(element) {
   }
 }
 
-function dataIslandRender(x, node) {
+function dataIslandRender(dynarex, x, node) {
   
-  var file = x.attribute('data').to_s();
   var sort_by = x.attribute('sort_by');
   var range = x.attribute('range');
   var rows_per_page = x.attribute('rows_per_page');
-  var page = x.attribute('page');
     
-  var dynarex = Dynarex.new(file);
   recOriginal = findHTMLRecordToClone(node);
   
   if (recOriginal) {
@@ -57,9 +54,10 @@ function dataIslandRender(x, node) {
     var destNodes = [];
     
     records = dynarex.records;
-    
-    if (rows_per_page != nil && page != nil){
-      var pg = page.to_i()
+        
+    if (rows_per_page != nil){
+      var page = o(location.href).regex(/#page=(\d+)$/,1)
+      var pg = (page != nil) ? page.to_i() : 1;
       var rpp = rows_per_page.to_i();
       x.setAttribute('range', (pg > 1) ? 
         (pg - 1) * rpp + '..' + (((pg - 1) * rpp ) + rpp - 1) : '0..' + (rpp - 1))
@@ -73,30 +71,37 @@ function dataIslandRender(x, node) {
 
     if (sort_by != nil) {
       if (sort_by.regex(/^-/) == nil) {
-        var sort_field = sort_by.to_s();
-        var recs = records.sort_by(function(record){ return record.get(sort_field); });
+        var recs = records.sort_by(function(record){ return record.get(sort_by.to_s()); });
       }
       else {
-        var sort_field = sort_by.range(1,-1).to_s();
-        var recs = records.sort_by(function(record){ return record.get(sort_field); }).reverse();
+        var recs = records.sort_by(function(record){ 
+          return record.get(sort_by.range(1,-1).to_s()); 
+        }).reverse();
       }
     }
     else {
-      var recs = dynarex.records;
+      var recs = records;
     }
     recs.each(function(record){    
-      rec = recOriginal.cloneNode(true);
+      rec = recOriginal.deep_clone();
 
-      rec.xpath('//span[@datafld]').each(function(span){
-        destNodes[span.attribute('datafld').downcase()] = span;
+      rec.xpath('//*[@datafld]').each(function(e){
+        destNodes[e.attribute('datafld').downcase().to_s()] = e;
       });
 
       for (field in destNodes){
         if (record.get(field) == nil) continue;
-        destNodes[field].innerHTML = record.get(field).to_s();
+        switch (o(destNodes[field].nodeName).downcase().to_s()) {
+          case 'span' :
+            destNodes[field].innerHTML = record.get(field).to_s();
+            break;
+          case 'a' :
+            destNodes[field].setAttribute('href', record.get(field).to_s());
+            break;
+        }
       }    
 
-      recOriginal.parentNode.appendChild(rec);
+      recOriginal.parent().append(rec);
     });
 
     //recOriginal.parentNode.removeChild(recOriginal);
@@ -107,13 +112,94 @@ function dataIslandRender(x, node) {
 
 function dataIslandInit(){
   document.xpath("//object[@type='text/xml']").each( function(x){
-    xpath = "//*[@datasrc='#" + x.attribute('id').to_s() + "']"
+
+    var dynarex = Dynarex.new(x.attribute('data').to_s());
+    var order = x.attribute('order');
+    
+    if (order != nil && order.regex(/^asc|desc|ascending|descending$/)){
+      x.dynarex = {};
+      x.dynarex.records = (order.regex(/^desc|descending$/)) ? dynarex.records.reverse() : dynarex.records;      
+    }    
+    
+    var datactl = '#' + x.attribute('id').to_s()
+    xpath = "//*[@datasrc='" + datactl + "']";
+    
     document.xpath(xpath).each(function(island){
-      dataIslandRender(x, island.element('//span[@datafld]'));
+      
+      island.template = island.deep_clone();
+      dataIslandRender(x.dynarex, x, island.element('//*[@datafld]'));
+      
+      var raw_page = o(location.href).regex(/#page=(\d+)$/,1)
+      var pg = raw_page == nil ? 1 : raw_page.to_i()      
+      refreshRecordControls(pg, document.element("//*[@datactl='" + datactl + "']/button"));
     });
   });
 }
 
-dynarexDataIsland = {init: dataIslandInit}
+function dataIslandRefresh(){
+  document.xpath("//object[@type='text/xml']").each( function(x){    
+    
+    xpath = "//*[@datasrc='#" + x.attribute('id').to_s() + "']";    
+    
+    document.xpath(xpath).each(function(prev_island){
+      
+      var island = prev_island.template;
+      island.template = island.deep_clone();
+      prev_island.parent().append(island);
+      prev_island.delete();
+      dataIslandRender(x.dynarex, x, island.element('//*[@datafld]'));
+      
+    });
+  });
+}
+
+
+dynarexDataIsland = {init: dataIslandInit, refresh: dataIslandRefresh}
 //dynarexDataIsland.init();
 //-- end of dynarex data islands
+
+// -- start of UI functions ---
+  function gotoPage(pg, btn){
+
+    var href = o(location.href).sub(/#page=\d+$/,'').to_s();
+    
+    location.href = href + '#page=' + pg;
+    dynarexDataIsland.refresh();
+    refreshRecordControls(pg, btn);
+  }
+
+  function next(btn){    
+    var raw_page = o(location.href).regex(/#page=(\d+)$/,1)
+    var pg = raw_page == nil ? 2 : raw_page.succ().to_i()
+    gotoPage(pg, btn);
+  }
+
+  function previous(btn){
+    var raw_page = o(location.href).regex(/#page=(\d+)$/,1)
+    var pg = raw_page.to_i() - 1;
+    gotoPage(pg, btn);
+  }
+
+  function refreshRecordControls(pg, btn){
+
+    var datactl = btn.parent().attribute('datactl').range(1,-1).to_s();
+    var x = document.element("//object[@id='" + datactl + "']");
+    var e = document.element("//*[@datactl='#" + datactl + "']");
+    var btnPrevious = e.element("button[@id='previous']");
+    var btnNext = e.element("button[@id='next']");
+
+    // -- next button --   
+    var count = x.dynarex.records.count();
+    var rpp = x.attribute('rows_per_page').to_i();
+    (pg * rpp > count) ? btnNext.setAttribute('disabled','disabled') : 
+      btnNext.removeAttribute('disabled');
+    // -- end of next button
+
+    // -- previous button --
+    (pg > 1) ? btnPrevious.removeAttribute('disabled') : 
+      btnPrevious.setAttribute('disabled','disabled');
+    // -- end of previous button
+
+    document.getElementById('debug').innerHTML = 'page ' + pg;
+  }
+// -- end of UI functions ---
