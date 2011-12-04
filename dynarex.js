@@ -41,6 +41,22 @@ function findHTMLRecordToClone(element) {
   }
 }
 
+function findRange(page, rows_per_page, x){
+  if (page != nil) {
+    if (page.to_s() == 'all') {return nil;}
+    else {pg = page.to_i();}
+  }
+  else
+  {
+    pg = 1;
+  }
+  var pg = (page != nil) ? page.to_i() : 1;
+  var rpp = rows_per_page.to_i();
+  x.setAttribute('range', (pg > 1) ? 
+    (pg - 1) * rpp + '..' + (((pg - 1) * rpp ) + rpp - 1) : '0..' + (rpp - 1))
+  return x.attribute('range');
+}
+
 function dataIslandRender(dynarex, x, node) {
   
   var sort_by = x.attribute('sort_by');
@@ -56,13 +72,9 @@ function dataIslandRender(dynarex, x, node) {
     
     records = dynarex.records;
         
-    if (rows_per_page != nil){
-      var page = o(location.href).regex(/#page=(\d+)$/,1)
-      var pg = (page != nil) ? page.to_i() : 1;
-      var rpp = rows_per_page.to_i();
-      x.setAttribute('range', (pg > 1) ? 
-        (pg - 1) * rpp + '..' + (((pg - 1) * rpp ) + rpp - 1) : '0..' + (rpp - 1))
-      range = x.attribute('range');
+    if (rows_per_page != nil && !rows_per_page.empty_b() ){
+      var page = o(location.href).regex(/#page=(\d+|all)$/,1)      
+      range = findRange(page, rows_per_page, x);
     }
     
     if (range != nil && range.length() > 0) {
@@ -133,7 +145,7 @@ function dataIslandInit(){
       
       var raw_page = o(location.href).regex(/#page=(\d+)$/,1)
       var pg = raw_page == nil ? 1 : raw_page.to_i()      
-      refreshRecordControls(pg, document.element("//*[@datactl='" + datactl + "']/button"));
+      refreshRecordControls(pg, document.element("//*[@datactl='" + datactl + "']/span/button"));
     });
   });
 }
@@ -163,7 +175,7 @@ dynarexDataIsland = {init: dataIslandInit, refresh: dataIslandRefresh}
 // -- start of UI functions ---
   function gotoPage(pg, btn){
 
-    var href = o(location.href).sub(/#page=\d+$/,'').to_s();
+    var href = o(location.href).sub(/#page=(\d+|all)$/,'').to_s();
     
     location.href = href + '#page=' + pg;
     dynarexDataIsland.refresh();
@@ -184,9 +196,9 @@ dynarexDataIsland = {init: dataIslandInit, refresh: dataIslandRefresh}
 
   function refreshRecordControls(pg, btn){
 
-    var datactl = btn.parent().attribute('datactl').range(1,-1).to_s();
+    var datactl = btn.parent().parent().attribute('datactl').range(1,-1).to_s();
     var x = document.element("//object[@id='" + datactl + "']");
-    var e = document.element("//*[@datactl='#" + datactl + "']");
+    var e = document.element("//*[@datactl='#" + datactl + "']/span");
     var btnPrevious = e.element("button[@id='previous']");
     var btnNext = e.element("button[@id='next']");
     var btnPage1 = e.element("button[@id='page1']");
@@ -209,6 +221,31 @@ dynarexDataIsland = {init: dataIslandInit, refresh: dataIslandRefresh}
     }
     // -- end of previous button
 
-    document.getElementById('debug').innerHTML = 'page ' + pg;
+    if (btnNext.attribute('disabled').to_s() == 'disabled' &&
+	btnPrevious.attribute('disabled').to_s() == 'disabled') {
+      btn.parent().parent().set_attribute('style','display: none');
+    }
+    else {
+      document.getElementById('debug').innerHTML = 'page ' + pg;
+    }
+  }
+  
+  function showAllRecords(btn){
+
+    gotoPage('all', btn);    
+
+    btn.parent().element("button[@id='indi']").set_attribute('style','display: block');
+    btn.set_attribute('style','display: none');
+    btn.parent().parent().element("span[@class='rctl']").set_attribute('style','display: none');
+    
+  }
+  
+  function showIndividualPages(btn){
+
+    btn.parent().parent().element("span[@class='rctl']").set_attribute('style','display: block');
+    btn.parent().element("button[@id='all']").set_attribute('style','display: block');
+    btn.set_attribute('style','display: none');
+    
+    gotoPage(1, btn);     
   }
 // -- end of UI functions ---
