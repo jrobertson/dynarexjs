@@ -33,7 +33,8 @@ function findHTMLRecordToClone(element) {
     case 'body' : 
       return null; 
       break;
-    case 'tr' : 
+    case 'tr' :
+    case 'li' : 
       return parent; 
       break;
     default :
