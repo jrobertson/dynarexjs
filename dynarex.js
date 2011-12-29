@@ -27,7 +27,7 @@ Dynarex = {new: dynarexNew};
 function findHTMLRecordToClone(element) {
 
   parent = element.parent();
-  parentName = parent.name().downcase().to_s();
+  parentName = o(parent.nodeName).downcase().to_s();
 
   switch (parentName) {
     case 'body' : 
@@ -99,10 +99,17 @@ function dataIslandRender(dynarex, x, node) {
     recs.each(function(record){    
       rec = recOriginal.deep_clone();
 
-      rec.xpath('//*[@datafld]').each(function(e){
+      rec.xpath('.//*[@datafld]').each(function(e){
         destNodes[e.attribute('datafld').downcase().to_s()] = e;
       });
 
+      rec.xpath('.//a[@name]').each(function(e){
+	r = e.attribute('name').regex(/^\{([^\}]+)\}$/,1);
+	if (r != nil){
+	  destNodes[r.to_s()] = e;
+	}
+      });
+      
       for (field in destNodes){
         if (record.get(field) == nil) continue;
         switch (o(destNodes[field].nodeName).downcase().to_s()) {
@@ -110,16 +117,26 @@ function dataIslandRender(dynarex, x, node) {
             destNodes[field].innerHTML = record.get(field).to_s();
             break;
           case 'a' :
-            destNodes[field].setAttribute('href', record.get(field).to_s());
+	    var name = '';
+	    if (destNodes[field].attribute('datafld') != nil) {
+	      name = 'href';
+	    }
+	    else if (destNodes[field].attribute('name') != nil){
+	      name = 'name';
+	    }
+	    destNodes[field].set_attribute(name, record.get(field).to_s());	    
             break;
+          case 'img' :
+            destNodes[field].set_attribute('src', record.get(field).to_s());
+            break;	    
         }
       }    
-
+                  
       recOriginal.parent().append(rec);
     });
 
     //recOriginal.parentNode.removeChild(recOriginal);
-    rec.delete();
+    recOriginal.delete();
   }
 
 }
@@ -142,11 +159,13 @@ function dataIslandInit(){
     document.xpath(xpath).each(function(island){
       
       island.template = island.deep_clone();
-      dataIslandRender(x.dynarex, x, island.element('//*[@datafld]'));
+      dataIslandRender(x.dynarex, x, island.element('.//*[@datafld]'));
       
       var raw_page = o(location.href).regex(/#page=(\d+)$/,1)
       var pg = raw_page == nil ? 1 : raw_page.to_i()      
+      if (island.parent().element("div[@datactl]") != nil) {
       refreshRecordControls(pg, document.element("//*[@datactl='" + datactl + "']/span/button"));
+      }
     });
   });
 }
@@ -154,7 +173,7 @@ function dataIslandInit(){
 function dataIslandRefresh(){
   document.xpath("//object[@type='text/xml']").each( function(x){    
     
-    xpath = "//*[@datasrc='#" + x.attribute('id').to_s() + "']";    
+    xpath = ".//*[@datasrc='#" + x.attribute('id').to_s() + "']";    
     
     document.xpath(xpath).each(function(prev_island){
       
