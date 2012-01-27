@@ -109,6 +109,13 @@ function dataIslandRender(dynarex, x, node) {
 	  destNodes[r.to_s()] = e;
 	}
       });
+
+      rec.xpath('.//a[@href]').each(function(e){
+	r = e.attribute('href').regex(/\{([^\}]+)\}/,1);
+	if (r != nil){
+	  destNodes[r.to_s()] = e;
+	}
+      });
       
       for (field in destNodes){
         if (record.get(field) == nil) continue;
@@ -117,14 +124,23 @@ function dataIslandRender(dynarex, x, node) {
             destNodes[field].innerHTML = record.get(field).to_s();
             break;
           case 'a' :
-	    var name = '';
+
 	    if (destNodes[field].attribute('datafld') != nil) {
-	      name = 'href';
+	      destNodes[field].set_attribute('href', record.get(field).to_s());	    
 	    }
 	    else if (destNodes[field].attribute('name') != nil){
-	      name = 'name';
+	      destNodes[field].set_attribute('name', record.get(field).to_s());	    
 	    }
-	    destNodes[field].set_attribute(name, record.get(field).to_s());	    
+	    else if (destNodes[field].attribute('href') != nil){
+	      
+	      var href = destNodes[field].attribute('href');
+	      if (href.regex(/\{/) != nil){
+		var val = record.get(field).to_s();
+		new_href = href.sub(/\{[^\}]+\}/,val).to_s();
+		destNodes[field].set_attribute('href', new_href);	    
+	      }
+	    }	    
+
             break;
           case 'img' :
             destNodes[field].set_attribute('src', record.get(field).to_s());
