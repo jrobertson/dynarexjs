@@ -73,7 +73,7 @@ function dataIslandRender(dynarex, x, node) {
     
     records = dynarex.records;
         
-    if (rows_per_page != nil && !rows_per_page.empty_b() ){
+    if (rows_per_page != nil && !rows_per_page.empty_q() ){
       var page = o(location.href).regex(/#page=(\d+|all)$/,1)      
       range = findRange(page, rows_per_page, x);
     }
