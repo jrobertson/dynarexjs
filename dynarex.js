@@ -7,12 +7,12 @@ function dynarexNew(file) {
   var doc = Jaxle.new(file);
   var dynarex = new Object();
   
-  dynarex.summary = doc.firstChild.xpath('summary/*').inject({},function(r,item){
+  dynarex.summary = doc.documentElement.xpath('summary/*').inject({},function(r,item){
     var h = Hash(item.nodeName, item.text().to_s() );
     return r.merge(h);
   });
   
-  dynarex.records = doc.firstChild.xpath('records/*').map(function(rec){
+  dynarex.records = doc.documentElement.xpath('records/*').map(function(rec){
     return rec.elements().inject({},function(r,field){
       return field.nodeType == 1 ? 
         r.merge(Hash(field.nodeName, field.text().to_s())) : nil;
@@ -99,16 +99,26 @@ function dataIslandRender(dynarex, x, node) {
     recs.each(function(record){    
       rec = recOriginal.deep_clone();
 
+      rec.xpath('.//span[@class]|.//a[@class]').each(function(e){
+        r = e.attribute('class').regex(/\{([^\}]+)\}$/,1);
+        if (r != nil){
+          destNodes[r.to_s()] = e;
+        }
+      });    
+            
       rec.xpath('.//*[@datafld]').each(function(e){
         destNodes[e.attribute('datafld').downcase().to_s()] = e;
       });
 
+      // jr 12-Apr-2012 the statement below should now be removed
       rec.xpath('.//a[@name]').each(function(e){
 	r = e.attribute('name').regex(/^\{([^\}]+)\}$/,1);
 	if (r != nil){
 	  destNodes[r.to_s()] = e;
 	}
       });
+      
+  
 
       rec.xpath('.//a[@href]').each(function(e){
 	r = e.attribute('href').regex(/\{([^\}]+)\}/,1);
@@ -121,25 +131,49 @@ function dataIslandRender(dynarex, x, node) {
         if (record.get(field) == nil) continue;
         switch (o(destNodes[field].nodeName).downcase().to_s()) {
           case 'span' :
-            destNodes[field].innerHTML = record.get(field).to_s();
+            if (destNodes[field].attribute('class') != nil) {
+              
+              var classx = destNodes[field].attribute('class');
+              if (classx.regex('{' + field) != nil){
+                var val = record.get(field).to_s();
+                new_class = classx.sub(/\{[^\}]+\}/,val).to_s();
+                destNodes[field].set_attribute('class', new_class);           
+              }
+              else if (destNodes[field].attribute('datafld') != nil) {
+                destNodes[field].innerHTML = record.get(field).to_s();
+              }              
+            }
+            else if (destNodes[field].attribute('datafld') != nil) {
+              destNodes[field].innerHTML = record.get(field).to_s();
+            }
             break;
+            
           case 'a' :
 
-	    if (destNodes[field].attribute('datafld') != nil) {
-	      destNodes[field].set_attribute('href', record.get(field).to_s());	    
-	    }
-	    else if (destNodes[field].attribute('name') != nil){
-	      destNodes[field].set_attribute('name', record.get(field).to_s());	    
-	    }
-	    else if (destNodes[field].attribute('href') != nil){
-	      
-	      var href = destNodes[field].attribute('href');
-	      if (href.regex(/\{/) != nil){
-		var val = record.get(field).to_s();
-		new_href = href.sub(/\{[^\}]+\}/,val).to_s();
-		destNodes[field].set_attribute('href', new_href);	    
-	      }
-	    }	    
+            if (destNodes[field].attribute('datafld') != nil) {
+              destNodes[field].set_attribute('href', record.get(field).to_s());
+
+              if (destNodes[field].attribute('class') != nil) {
+                var classx = destNodes[field].attribute('class');
+                if (classx.regex('{' + field) != nil){
+                  var val = record.get(field).to_s();
+                  new_class = classx.sub(/\{[^\}]+\}/,val).to_s();
+                  destNodes[field].set_attribute('class', new_class);           
+                }
+              }
+            }
+            else if (destNodes[field].attribute('name') != nil){
+              destNodes[field].set_attribute('name', record.get(field).to_s());	    
+            }
+            else if (destNodes[field].attribute('href') != nil){
+              
+              var href = destNodes[field].attribute('href');
+              if (href.regex(/\{/) != nil){
+                var val = record.get(field).to_s();
+                new_href = href.sub(/\{[^\}]+\}/,val).to_s();
+                destNodes[field].set_attribute('href', new_href);	    
+              }
+            }	    
 
             break;
           case 'img' :
