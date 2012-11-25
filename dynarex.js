@@ -58,6 +58,15 @@ function findRange(page, rows_per_page, x){
   return x.attribute('range');
 }
 
+function addToDestnodes(destNodes, key, htmlFragment) {
+  if (destNodes[key]) {
+    destNodes[key].push(htmlFragment);
+  }
+  else {
+    destNodes[key] = [htmlFragment];
+  }
+}
+
 function dataIslandRender(dynarex, x, node) {
   
   var sort_by = x.attribute('sort_by');
@@ -69,7 +78,7 @@ function dataIslandRender(dynarex, x, node) {
   if (recOriginal) {
 
     // get a reference to each element containing the datafld attribute
-    var destNodes = [];
+
     
     records = dynarex.records;
         
@@ -97,89 +106,98 @@ function dataIslandRender(dynarex, x, node) {
       var recs = records;
     }
     recs.each(function(record){    
+      
       rec = recOriginal.deep_clone();
-
+      var destNodes = [];
+      
       rec.xpath('.//span[@class]|.//a[@class]').each(function(e){
         r = e.attribute('class').regex(/\{([^\}]+)\}$/,1);
         if (r != nil){
-          destNodes[r.to_s()] = e;
+          addToDestnodes(destNodes, r.to_s(), e)
         }
       });    
             
       rec.xpath('.//*[@datafld]').each(function(e){
-        destNodes[e.attribute('datafld').downcase().to_s()] = e;
+        addToDestnodes(destNodes, e.attribute('datafld').downcase().to_s(), e)
       });
 
       // jr 12-Apr-2012 the statement below should now be removed
       rec.xpath('.//a[@name]').each(function(e){
-	r = e.attribute('name').regex(/^\{([^\}]+)\}$/,1);
-	if (r != nil){
-	  destNodes[r.to_s()] = e;
-	}
+        r = e.attribute('name').regex(/^\{([^\}]+)\}$/,1);
+        if (r != nil){
+          addToDestnodes(destNodes, r.to_s(), e)
+        }
+      });
+                    
+      rec.xpath('.//a[@href]').each(function(e){
+        r = e.attribute('href').regex(/\{([^\}]+)\}/,1);
+        if (r != nil){
+          addToDestnodes(destNodes, r.to_s(), e)
+        }
       });
       
-  
-
-      rec.xpath('.//a[@href]').each(function(e){
-	r = e.attribute('href').regex(/\{([^\}]+)\}/,1);
-	if (r != nil){
-	  destNodes[r.to_s()] = e;
-	}
-      });
       
       for (field in destNodes){
+        
         if (record.get(field) == nil) continue;
-        switch (o(destNodes[field].nodeName).downcase().to_s()) {
-          case 'span' :
-            if (destNodes[field].attribute('class') != nil) {
               
-              var classx = destNodes[field].attribute('class');
-              if (classx.regex('{' + field) != nil){
-                var val = record.get(field).to_s();
-                new_class = classx.sub(/\{[^\}]+\}/,val).to_s();
-                destNodes[field].set_attribute('class', new_class);           
-              }
-              else if (destNodes[field].attribute('datafld') != nil) {
-                destNodes[field].innerHTML = record.get(field).to_s();
-              }              
-            }
-            else if (destNodes[field].attribute('datafld') != nil) {
-              destNodes[field].innerHTML = record.get(field).to_s();
-            }
-            break;
+        destNodes[field].forEach(function(e2) {
+          
+          //o2 = e2.to_object();
+          
+          switch (o(e2.nodeName).downcase().to_s()) {
             
-          case 'a' :
-
-            if (destNodes[field].attribute('datafld') != nil) {
-              destNodes[field].set_attribute('href', record.get(field).to_s());
-
-              if (destNodes[field].attribute('class') != nil) {
-                var classx = destNodes[field].attribute('class');
+            case 'span' :
+              if (e2.attribute('class') != nil) {
+                
+                var classx = e2.attribute('class');
                 if (classx.regex('{' + field) != nil){
                   var val = record.get(field).to_s();
                   new_class = classx.sub(/\{[^\}]+\}/,val).to_s();
-                  destNodes[field].set_attribute('class', new_class);           
+                  e2.set_attribute('class', new_class);           
+                }
+                else if (e2.attribute('datafld') != nil) {
+                  e2.innerHTML = record.get(field).to_s();
+                }              
+              }
+              else if (e2.attribute('datafld') != nil) {
+                e2.innerHTML = record.get(field).to_s();
+              }
+              break;
+              
+            case 'a' :
+
+              if (e2.attribute('datafld') != nil) {
+                e2.set_attribute('href', record.get(field).to_s());
+
+                if (e2.attribute('class') != nil) {
+                  var classx = e2.attribute('class');
+                  if (classx.regex('{' + field) != nil){
+                    var val = record.get(field).to_s();
+                    new_class = classx.sub(/\{[^\}]+\}/,val).to_s();
+                    e2.set_attribute('class', new_class);           
+                  }
                 }
               }
-            }
-            else if (destNodes[field].attribute('name') != nil){
-              destNodes[field].set_attribute('name', record.get(field).to_s());	    
-            }
-            else if (destNodes[field].attribute('href') != nil){
-              
-              var href = destNodes[field].attribute('href');
-              if (href.regex(/\{/) != nil){
-                var val = record.get(field).to_s();
-                new_href = href.sub(/\{[^\}]+\}/,val).to_s();
-                destNodes[field].set_attribute('href', new_href);	    
+              else if (e2.attribute('name') != nil){
+                e2.set_attribute('name', record.get(field).to_s());	    
               }
-            }	    
+              else if (e2.attribute('href') != nil){
+                
+                var href = e2.attribute('href');
+                if (href.regex(/\{/) != nil){
+                  var val = record.get(field).to_s();
+                  new_href = href.sub(/\{[^\}]+\}/,val).to_s();
+                  e2.set_attribute('href', new_href);	    
+                }
+              }	    
 
-            break;
-          case 'img' :
-            destNodes[field].set_attribute('src', record.get(field).to_s());
-            break;	    
-        }
+              break;
+            case 'img' :
+              e2.set_attribute('src', record.get(field).to_s());
+              break;	    
+          }
+        });
       }    
                   
       recOriginal.parent().append(rec);
