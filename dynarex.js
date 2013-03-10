@@ -117,6 +117,13 @@ function dataIslandRender(dynarex, x, node) {
         }
       });    
             
+      rec.xpath('.//object[@data]').each(function(e){
+        r = e.attribute('data').regex(/\{([^\}]+)\}$/,1);
+        if (r != nil){
+          addToDestnodes(destNodes, r.to_s(), e)
+        }
+      });    
+            
       rec.xpath('.//*[@datafld]').each(function(e){
         addToDestnodes(destNodes, e.attribute('datafld').downcase().to_s(), e)
       });
@@ -196,6 +203,17 @@ function dataIslandRender(dynarex, x, node) {
             case 'img' :
               e2.set_attribute('src', record.get(field).to_s());
               break;	    
+            case 'object' :
+              if (e2.attribute('data') != nil) {
+                
+                var datax = e2.attribute('data');
+                if (datax.regex('{' + field) != nil){
+                  var val = record.get(field).to_s();
+                  new_data = datax.sub(/\{[^\}]+\}/,val).to_s();
+                  e2.set_attribute('data', new_data);           
+                }
+              }
+              break;
           }
         });
       }    
