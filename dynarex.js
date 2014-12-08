@@ -143,6 +143,13 @@ function dataIslandRender(dynarex, x, node) {
         }
       });
       
+      rec.xpath('.//button[@onclick]').each(function(e){
+        r = e.attribute('onclick').regex(/\{([^\}]+)\}/,1);
+        if (r != nil){
+          addToDestnodes(destNodes, r.to_s(), e)
+        }
+      });      
+      
       
       for (field in destNodes){
         
@@ -214,6 +221,17 @@ function dataIslandRender(dynarex, x, node) {
                 }
               }
               break;
+            case 'button' :
+              if (e2.attribute('onclick') != nil) {
+                
+                var onclick = e2.attribute('onclick');
+                if (onclick.regex('{' + field) != nil){
+                  var val = record.get(field).to_s();
+                  new_data = onclick.sub(/\{[^\}]+\}/,val).to_s();
+                  e2.set_attribute('onclick', new_data);           
+                }
+              }
+              break;              
           }
         });
       }    
